@@ -20,7 +20,7 @@ def main():
     setup(
         name='pytest-flakybot',
         version='0.1.1',
-        description='Plugin for pytest flakybot that automatically reruns flaky tests.',
+        description='Aviator\'s Flakybot pytest plugin that automatically reruns flaky tests.',
         long_description=open(join(base_dir, 'README.md')).read(),
         author='aviator-co',
         author_email='info@aviator.co',
