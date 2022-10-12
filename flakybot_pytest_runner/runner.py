@@ -3,7 +3,6 @@ import requests
 
 from flakybot_pytest_runner.attributes import FlakyTestAttributes, DEFAULT_MIN_PASSES, DEFAULT_MAX_RUNS
 
-
 AVIATOR_MARKER = "aviator"
 BUILDKITE_JOB_PREFIX = "buildkite/"
 CIRCLECI_JOB_PREFIX = "ci/circleci:"
@@ -33,6 +32,11 @@ class FlakybotRunner:
         config.addinivalue_line("markers", f"{AVIATOR_MARKER}: marks flaky tests for Flakybot to automatically rerun")
 
     def get_flaky_tests(self):
+        """
+        Get flaky test information from the Aviator API.
+
+        :return: None
+        """
         repo_name = None
         job_name = None
 
@@ -101,7 +105,7 @@ class FlakybotRunner:
         """
         Copy flaky attributes from the test to the attribute dict.
 
-        :param test: The test that is being prepared to run
+        :param test: The test that is being prepared to run.
         """
         test_callable = cls._get_test_callable(test)
         if test_callable is None:
@@ -117,12 +121,6 @@ class FlakybotRunner:
 
     @classmethod
     def _get_test_callable(cls, test):
-        """
-        Base class override.
-
-        :param test: The test that has raised an error or succeeded
-        :return: The test declaration, callable and name that is being run
-        """
         callable_name = test.name
         if callable_name.endswith("]") and "[" in callable_name:
             unparametrized_name = callable_name[:callable_name.index("[")]
@@ -160,14 +158,13 @@ class FlakybotRunner:
         :return: Dictionary containing attributes.
         """
         return {
-            attr: getattr(test_item, attr, None) for attr in FlakyTestAttributes()
+            attr: getattr(test_item, attr, None) for attr in FlakyTestAttributes().items()
         }
 
     @staticmethod
     def _set_flaky_attribute(test_item, flaky_attribute, value):
         """
-        Sets an attribute on a flaky test. Uses magic __dict__ since setattr
-        doesn't work for bound methods.
+        Sets an attribute on a flaky test.
 
         :param test_item: The test callable on which to set the attribute.
         :param flaky_attribute: The name of the attribute.
@@ -176,33 +173,20 @@ class FlakybotRunner:
         test_item.__dict__[flaky_attribute] = value
 
     @classmethod
-    def _mark_flaky(cls, test, max_runs=None, min_passes=None, rerun_filter=None):
+    def _mark_flaky(cls, test, max_runs=None, min_passes=None):
         """
         Mark a test as flaky by setting flaky attributes.
 
         :param test: The given test.
         :param max_runs: The value of the FlakyTestAttributes.MAX_RUNS attribute to use.
         :param min_passes: The value of the FlakyTestAttributes.MIN_PASSES attribute to use.
-        :param rerun_filter:
-            Filter function to decide whether a test should be rerun if it fails.
-            Function signature is as follows:
-                (err, name, test, plugin) -> should_rerun
-            - err (`tuple` of `class`, :class:`Exception`, `traceback`):
-                Information about the test failure (from sys.exc_info())
-            - name (`unicode`):
-                The test name
-            - test (:class:`nose.case.Test` or :class:`Function`):
-                The test that has raised an error
-            - plugin (:class:`FlakyPytestPlugin`):
-                The flakybot plugin. Has a :prop:`stream` that can be written to in
-                order to add to the Flaky Report.
         """
-        attrib_dict = FlakyTestAttributes.default_flaky_attributes(max_runs, min_passes, rerun_filter)
+        attrib_dict = FlakyTestAttributes.default_flaky_attributes(max_runs, min_passes)
         for attr, value in attrib_dict.items():
             cls._set_flaky_attribute(test, attr, value)
 
 
 PLUGIN = FlakybotRunner()
 for _pytest_hook in dir(PLUGIN):
-    if _pytest_hook.startswith('pytest_'):
+    if _pytest_hook.startswith("pytest_"):
         globals()[_pytest_hook] = getattr(PLUGIN, _pytest_hook)

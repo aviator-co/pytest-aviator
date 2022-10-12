@@ -23,22 +23,14 @@ class FlakyTestAttributes:
             self.RERUN_FILTER,
         )
 
-    def __iter__(self):
-        yield from self.items()
-
     @staticmethod
-    def default_flaky_attributes(max_runs=None, min_passes=None, rerun_filter=None):
+    def default_flaky_attributes(max_runs=None, min_passes=None):
         """
         Returns the default flaky attributes to set on a flaky test.
 
         :param max_runs: The value of the MAX_RUNS attribute to use.
-
         :param min_passes: The value of the MIN_PASSES attribute to use.
-
-        :param rerun_filter:
-            Filter function to decide whether a test should be rerun if it fails.
         :return: Dict of default flaky attributes to set on a flaky test.
-
         """
         if max_runs is None:
             max_runs = DEFAULT_MAX_RUNS
