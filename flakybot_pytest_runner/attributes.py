@@ -11,7 +11,6 @@ class FlakyTestAttributes:
     CURRENT_PASSES = '_current_passes'
     MAX_RUNS = '_max_runs'
     MIN_PASSES = '_min_passes'
-    RERUN_FILTER = '_rerun_filter'
 
     def items(self):
         return (
@@ -20,7 +19,6 @@ class FlakyTestAttributes:
             self.CURRENT_RUNS,
             self.MAX_RUNS,
             self.MIN_PASSES,
-            self.RERUN_FILTER,
         )
 
     @staticmethod
@@ -32,14 +30,14 @@ class FlakyTestAttributes:
         :param min_passes: The value of the MIN_PASSES attribute to use.
         :return: Dict of default flaky attributes to set on a flaky test.
         """
-        if max_runs is None:
+        if not max_runs:
             max_runs = DEFAULT_MAX_RUNS
-        if min_passes is None:
+        if not min_passes:
             min_passes = DEFAULT_MIN_PASSES
         if min_passes <= 0:
             raise ValueError('min_passes must be positive')
         if max_runs < min_passes:
-            raise ValueError('min_passes cannot be greater than max_runs!')
+            raise ValueError('min_passes is less than max_runs')
 
         return {
             FlakyTestAttributes.MAX_RUNS: max_runs,
