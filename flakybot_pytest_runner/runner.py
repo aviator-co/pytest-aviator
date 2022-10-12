@@ -12,6 +12,9 @@ class FlakybotRunner:
     runner = None
     _API_URL = "https://api.aviator.co/api/v1/flaky-tests"
     flaky_tests = {}
+    # Store attributes for flaky tests in the format:
+    # { flaky_test_key : { FlakyTestAttribute.MAX_RUNS: _, ... } }
+    flaky_attributes = {}
     min_passes = DEFAULT_MIN_PASSES
     max_runs = DEFAULT_MAX_RUNS
 
@@ -68,15 +71,9 @@ class FlakybotRunner:
             if test.get("test_name", ""):
                 self.flaky_tests[test["test_name"]] = test
 
-        print("flaky tests: ", self.flaky_tests)
-
     def pytest_runtest_protocol(self, item, nextitem):
-        test_instance = self._get_test_instance(item)
-        class_name = test_instance.__module__ + "." + test_instance.__name__
+        class_name = self._get_class_name(item)
 
-        print(f"test instance: {test_instance}")
-        print(f"class name: {class_name}")
-        print("test item: ", item.name)
         if (
             self.flaky_tests and
             self.flaky_tests.get(item.name) and
@@ -89,45 +86,92 @@ class FlakybotRunner:
             if self.flaky_tests[item.name].get("max_runs"):
                 max_runs = self.flaky_tests[item.name]["max_runs"]
             self._mark_flaky(item, max_runs, min_passes)
-            print("item dict: ", item.__dict__.items())
+            print("flaky_attributes: ", self.flaky_attributes)
+
+    @classmethod
+    def _get_class_name(cls, test):
+        """
+        Gets the combined module and class name of the test.
+
+        :param test: The test `Item` object.
+        :return: The module and class name as a string.
+            eg. "src.test.TestSample" for tests within a class
+                or "src.test" for tests not in a class
+        """
+        test_instance = FlakybotRunner._get_test_instance(test)
+        class_name = test_instance.__name__
+        if getattr(test_instance, "__module__", None):
+            class_name = test_instance.__module__ + "." + test_instance.__name__
+        return class_name
+
+    @classmethod
+    def _get_test_name(cls, test):
+        """
+        Gets the test name.
+
+        :param test: The test `Item` object.
+        :return: The test name as a string, eg. "test_sample"
+        """
+        callable_name = test.name
+        if callable_name.endswith("]") and "[" in callable_name:
+            unparametrized_name = callable_name[:callable_name.index("[")]
+        else:
+            unparametrized_name = callable_name
+        return unparametrized_name
+
+    @classmethod
+    def _get_test_key(cls, test):
+        """
+        Gets the value to use in the flaky_attributes dictionary for the given test.
+        The value is represented by the class and test names.
+
+        :param test: The test `Item` object.
+        :return: The key value as a string, eg. "src.test.test_sample" or "src.test.TestSample.test_sample"
+        """
+        return cls._get_class_name(test) + "." + cls._get_test_name(test)
 
     @staticmethod
     def _get_test_instance(item):
-        instance = item.instance
-        if not instance:
-            if item.parent and item.parent.obj:
-                instance = item.parent.obj
-        return instance
+        test_instance = getattr(item, "instance", None)
+        if test_instance is None:
+            if hasattr(item, "parent") and hasattr(item.parent, "obj"):
+                test_instance = item.parent.obj
+        return test_instance
 
     @classmethod
     def _get_flaky_attributes(cls, test_item):
         """
         Get all the flaky related attributes from the test.
 
-        :param test_item: The test callable from which to get the flaky related attributes.
+        :param test_item: The test `Item` object from which to get the flaky related attributes.
         :return: Dictionary containing attributes.
         """
+        test_key = cls._get_test_key(test_item)
+        flaky_dict = cls.flaky_attributes.get(test_key)
         return {
-            attr: getattr(test_item, attr, None) for attr in FlakyTestAttributes().items()
+            attr: getattr(flaky_dict, attr, None) for attr in FlakyTestAttributes().items()
         }
 
-    @staticmethod
-    def _set_flaky_attribute(test_item, attr, value):
+    @classmethod
+    def _set_flaky_attribute(cls, test_item, attr, value):
         """
         Sets an attribute on a flaky test.
 
-        :param test_item: The test callable on which to set the attribute.
+        :param test_item: The test `Item` object to set the attribute for.
         :param attr: The name of the attribute.
         :param value: The value to set the attribute to.
         """
-        test_item.__dict__[attr] = value
+        test_key = cls._get_test_key(test_item)
+        flaky_dict = cls.flaky_attributes.get(test_key) or {}
+        flaky_dict[attr] = value
+        cls.flaky_attributes[test_key] = flaky_dict
 
     @classmethod
     def _mark_flaky(cls, test, max_runs=None, min_passes=None):
         """
         Mark a test as flaky by setting flaky attributes.
 
-        :param test: The given test.
+        :param test: The test `Item` object.
         :param max_runs: The value of the FlakyTestAttributes.MAX_RUNS attribute to use.
         :param min_passes: The value of the FlakyTestAttributes.MIN_PASSES attribute to use.
         """

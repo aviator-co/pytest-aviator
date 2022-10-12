@@ -6,11 +6,11 @@ class FlakyTestAttributes:
     """
     Attributes that will be added to flaky tests.
     """
-    CURRENT_ERRORS = '_current_errors'
-    CURRENT_RUNS = '_current_runs'
-    CURRENT_PASSES = '_current_passes'
-    MAX_RUNS = '_max_runs'
-    MIN_PASSES = '_min_passes'
+    CURRENT_ERRORS = "current_errors"
+    CURRENT_RUNS = "current_runs"
+    CURRENT_PASSES = "current_passes"
+    MAX_RUNS = "max_runs"
+    MIN_PASSES = "min_passes"
 
     def items(self):
         return (
@@ -35,9 +35,9 @@ class FlakyTestAttributes:
         if not min_passes:
             min_passes = DEFAULT_MIN_PASSES
         if min_passes <= 0:
-            raise ValueError('min_passes must be positive')
+            raise ValueError("min_passes must be positive")
         if max_runs < min_passes:
-            raise ValueError('min_passes is less than max_runs')
+            raise ValueError("min_passes cannot be less than max_runs")
 
         return {
             FlakyTestAttributes.MAX_RUNS: max_runs,
