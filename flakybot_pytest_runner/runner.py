@@ -12,9 +12,6 @@ class FlakybotRunner:
     runner = None
     _API_URL = "https://api.aviator.co/api/v1/flaky-tests"
     flaky_tests = {}
-    # Store attributes for flaky tests in the format:
-    # { flaky_test_key : { FlakyTestAttribute.MAX_RUNS: _, ... } }
-    flaky_attributes = {}
     min_passes = DEFAULT_MIN_PASSES
     max_runs = DEFAULT_MAX_RUNS
 
@@ -86,7 +83,7 @@ class FlakybotRunner:
             if self.flaky_tests[item.name].get("max_runs"):
                 max_runs = self.flaky_tests[item.name]["max_runs"]
             self._mark_flaky(item, max_runs, min_passes)
-            print("flaky_attributes: ", self.flaky_attributes)
+            print("item dict: ", item.__dict__)
 
     @classmethod
     def _get_class_name(cls, test):
@@ -119,17 +116,6 @@ class FlakybotRunner:
             unparametrized_name = callable_name
         return unparametrized_name
 
-    @classmethod
-    def _get_test_key(cls, test):
-        """
-        Gets the value to use in the flaky_attributes dictionary for the given test.
-        The value is represented by the class and test names.
-
-        :param test: The test `Item` object.
-        :return: The key value as a string, eg. "src.test.test_sample" or "src.test.TestSample.test_sample"
-        """
-        return cls._get_class_name(test) + "." + cls._get_test_name(test)
-
     @staticmethod
     def _get_test_instance(item):
         test_instance = getattr(item, "instance", None)
@@ -146,10 +132,8 @@ class FlakybotRunner:
         :param test_item: The test `Item` object from which to get the flaky related attributes.
         :return: Dictionary containing attributes.
         """
-        test_key = cls._get_test_key(test_item)
-        flaky_dict = cls.flaky_attributes.get(test_key)
         return {
-            attr: getattr(flaky_dict, attr, None) for attr in FlakyTestAttributes().items()
+            attr: getattr(test_item, attr, None) for attr in FlakyTestAttributes().items()
         }
 
     @classmethod
@@ -161,10 +145,7 @@ class FlakybotRunner:
         :param attr: The name of the attribute.
         :param value: The value to set the attribute to.
         """
-        test_key = cls._get_test_key(test_item)
-        flaky_dict = cls.flaky_attributes.get(test_key) or {}
-        flaky_dict[attr] = value
-        cls.flaky_attributes[test_key] = flaky_dict
+        test_item.__dict__[attr] = value
 
     @classmethod
     def _mark_flaky(cls, test, max_runs=None, min_passes=None):
