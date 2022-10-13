@@ -2,6 +2,7 @@ import os
 import requests
 
 from flakybot_pytest_runner.attributes import FlakyTestAttributes, DEFAULT_MIN_PASSES, DEFAULT_MAX_RUNS
+from _pytest import runner
 
 API_URL = "https://api.aviator.co/api/v1/flaky-tests"
 AVIATOR_MARKER = "aviator"
@@ -14,6 +15,7 @@ class FlakybotRunner:
     flaky_tests = {}
     min_passes = DEFAULT_MIN_PASSES
     max_runs = DEFAULT_MAX_RUNS
+    call_infos = {}
 
     def __init__(self):
         super().__init__()
@@ -78,7 +80,52 @@ class FlakybotRunner:
             if self.flaky_tests[item.name].get("max_runs"):
                 max_runs = self.flaky_tests[item.name]["max_runs"]
             self._mark_flaky(item, max_runs, min_passes)
-            print("item dict: ", item.__dict__)
+
+        self.call_infos[item] = {}
+        default_call_and_report = self.runner.call_and_report
+        should_rerun = True
+        try:
+            self.runner.call_and_report = self.call_and_report
+            while should_rerun:
+                self.runner.pytest_runtest_protocol(item, nextitem)
+                for when in ["setup", "call"]:
+                    call_info = self.call_infos.get(item, {}).get(when, None)
+                    exc_info = getattr(call_info, "excinfo", None)
+                    print(f"exc info: {exc_info}")
+                    if exc_info:
+                        break
+
+                if not call_info:
+                    return False
+                passed = not exc_info
+                if passed:
+                    print(f"PASSED")
+                    should_rerun = False
+                else:
+                    print(f"NOT PASSED")
+                    # TODO: count failures
+        finally:
+            self.runner.call_and_report = default_call_and_report
+            del self.call_infos[item]
+        return True
+
+    def call_and_report(self, item, when, log=True, **kwds):
+        """
+        Monkey patch this runner method to get the CallInfo objects.
+            https://docs.pytest.org/en/7.1.x/_modules/_pytest/runner.html
+            CallInfo: https://docs.pytest.org/en/7.1.x/reference/reference.html#callinfo
+        """
+        call = runner.call_runtest_hook(item, when, **kwds)
+        self.call_infos[item][when] = call
+        hook = item.ihook
+        report = hook.pytest_runtest_makereport(item=item, call=call)
+
+        # TODO: report as success if reruns result in pass
+        if log:
+            hook.pytest_runtest_logreport(report=report)
+        if self.runner.check_interactive_exception(call, report):
+            hook.pytest_exception_interact(node=item, call=call, report=report)
+        return report
 
     def _get_class_name(self, test):
         """
