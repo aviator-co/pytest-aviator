@@ -10,7 +10,7 @@ CIRCLECI_JOB_PREFIX = "ci/circleci:"
 
 class FlakybotRunner:
     runner = None
-    _API_URL = "https://api.aviator.co/api/v1/flaky-tests"
+    API_URL = "https://api.aviator.co/api/v1/flaky-tests"
     flaky_tests = {}
     min_passes = DEFAULT_MIN_PASSES
     max_runs = DEFAULT_MAX_RUNS
@@ -54,14 +54,14 @@ class FlakybotRunner:
             repo_name = os.environ.get("BUILDKITE_REPO").replace("git@github.com:", "").replace(".git", "")
 
         # Fetch flaky test info
-        self._API_URL = os.environ.get("AVIATOR_API_URL") or self._API_URL
+        self.API_URL = os.environ.get("AVIATOR_API_URL") or self.API_URL
         API_TOKEN = os.environ.get("AVIATOR_API_TOKEN", "")
         headers = {
             "Authorization": "Bearer " + API_TOKEN,
             "Content-Type": "application/json"
         }
         params = {"repo_name": repo_name, "job_name": job_name}
-        response = requests.get(self._API_URL, headers=headers, params=params).json()
+        response = requests.get(self.API_URL, headers=headers, params=params).json()
         av_flaky_tests = response.get("flaky_tests", [])
 
         for test in av_flaky_tests:
@@ -85,8 +85,7 @@ class FlakybotRunner:
             self._mark_flaky(item, max_runs, min_passes)
             print("item dict: ", item.__dict__)
 
-    @classmethod
-    def _get_class_name(cls, test):
+    def _get_class_name(self, test):
         """
         Gets the combined module and class name of the test.
 
@@ -95,14 +94,14 @@ class FlakybotRunner:
             eg. "src.test.TestSample" for tests within a class
                 or "src.test" for tests not in a class
         """
-        test_instance = FlakybotRunner._get_test_instance(test)
+        test_instance = self._get_test_instance(test)
         class_name = test_instance.__name__
         if getattr(test_instance, "__module__", None):
             class_name = test_instance.__module__ + "." + test_instance.__name__
         return class_name
 
-    @classmethod
-    def _get_test_name(cls, test):
+    @staticmethod
+    def _get_test_name(test):
         """
         Gets the test name.
 
@@ -124,8 +123,8 @@ class FlakybotRunner:
                 test_instance = item.parent.obj
         return test_instance
 
-    @classmethod
-    def _get_flaky_attributes(cls, test_item):
+    @staticmethod
+    def _get_flaky_attributes(test_item):
         """
         Get all the flaky related attributes from the test.
 
@@ -136,8 +135,8 @@ class FlakybotRunner:
             attr: getattr(test_item, attr, None) for attr in FlakyTestAttributes().items()
         }
 
-    @classmethod
-    def _set_flaky_attribute(cls, test_item, attr, value):
+    @staticmethod
+    def _set_flaky_attribute(test_item, attr, value):
         """
         Sets an attribute on a flaky test.
 
@@ -147,8 +146,7 @@ class FlakybotRunner:
         """
         test_item.__dict__[attr] = value
 
-    @classmethod
-    def _mark_flaky(cls, test, max_runs=None, min_passes=None):
+    def _mark_flaky(self, test, max_runs=None, min_passes=None):
         """
         Mark a test as flaky by setting flaky attributes.
 
@@ -158,7 +156,7 @@ class FlakybotRunner:
         """
         attr_dict = FlakyTestAttributes.default_flaky_attributes(max_runs, min_passes)
         for attr, value in attr_dict.items():
-            cls._set_flaky_attribute(test, attr, value)
+            self._set_flaky_attribute(test, attr, value)
 
 
 PLUGIN = FlakybotRunner()

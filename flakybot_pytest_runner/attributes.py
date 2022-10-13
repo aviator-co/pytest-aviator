@@ -6,17 +6,17 @@ class FlakyTestAttributes:
     """
     Attributes that will be added to flaky tests.
     """
-    CURRENT_ERRORS = "current_errors"
-    CURRENT_RUNS = "current_runs"
-    CURRENT_PASSES = "current_passes"
+    FAILURES = "failures"
+    RUNS = "runs"
+    PASSES = "passes"
     MAX_RUNS = "max_runs"
     MIN_PASSES = "min_passes"
 
     def items(self):
         return (
-            self.CURRENT_ERRORS,
-            self.CURRENT_PASSES,
-            self.CURRENT_RUNS,
+            self.FAILURES,
+            self.PASSES,
+            self.RUNS,
             self.MAX_RUNS,
             self.MIN_PASSES,
         )
@@ -42,6 +42,6 @@ class FlakyTestAttributes:
         return {
             FlakyTestAttributes.MAX_RUNS: max_runs,
             FlakyTestAttributes.MIN_PASSES: min_passes,
-            FlakyTestAttributes.CURRENT_RUNS: 0,
-            FlakyTestAttributes.CURRENT_PASSES: 0,
+            FlakyTestAttributes.RUNS: 0,
+            FlakyTestAttributes.PASSES: 0,
         }
