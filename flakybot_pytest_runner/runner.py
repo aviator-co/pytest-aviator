@@ -3,6 +3,7 @@ import requests
 
 from flakybot_pytest_runner.attributes import FlakyTestAttributes, DEFAULT_MIN_PASSES, DEFAULT_MAX_RUNS
 
+API_URL = "https://api.aviator.co/api/v1/flaky-tests"
 AVIATOR_MARKER = "aviator"
 BUILDKITE_JOB_PREFIX = "buildkite/"
 CIRCLECI_JOB_PREFIX = "ci/circleci:"
@@ -10,7 +11,6 @@ CIRCLECI_JOB_PREFIX = "ci/circleci:"
 
 class FlakybotRunner:
     runner = None
-    API_URL = "https://api.aviator.co/api/v1/flaky-tests"
     flaky_tests = {}
     min_passes = DEFAULT_MIN_PASSES
     max_runs = DEFAULT_MAX_RUNS
@@ -32,11 +32,6 @@ class FlakybotRunner:
         config.addinivalue_line("markers", f"{AVIATOR_MARKER}: marks flaky tests for Flakybot to automatically rerun")
 
     def get_flaky_tests(self):
-        """
-        Get flaky test information from the Aviator API.
-
-        :return: None
-        """
         repo_name = None
         job_name = None
 
@@ -54,14 +49,14 @@ class FlakybotRunner:
             repo_name = os.environ.get("BUILDKITE_REPO").replace("git@github.com:", "").replace(".git", "")
 
         # Fetch flaky test info
-        self.API_URL = os.environ.get("AVIATOR_API_URL") or self.API_URL
-        API_TOKEN = os.environ.get("AVIATOR_API_TOKEN", "")
+        url = os.environ.get("AVIATOR_API_URL") or API_URL
+        api_token = os.environ.get("AVIATOR_API_TOKEN", "")
         headers = {
-            "Authorization": "Bearer " + API_TOKEN,
+            "Authorization": "Bearer " + api_token,
             "Content-Type": "application/json"
         }
         params = {"repo_name": repo_name, "job_name": job_name}
-        response = requests.get(self.API_URL, headers=headers, params=params).json()
+        response = requests.get(url, headers=headers, params=params).json()
         av_flaky_tests = response.get("flaky_tests", [])
 
         for test in av_flaky_tests:
@@ -110,10 +105,8 @@ class FlakybotRunner:
         """
         callable_name = test.name
         if callable_name.endswith("]") and "[" in callable_name:
-            unparametrized_name = callable_name[:callable_name.index("[")]
-        else:
-            unparametrized_name = callable_name
-        return unparametrized_name
+            return callable_name[:callable_name.index("[")]
+        return callable_name
 
     @staticmethod
     def _get_test_instance(item):
