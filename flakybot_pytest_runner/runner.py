@@ -219,7 +219,8 @@ class FlakybotRunner:
             all_errors = self._get_flaky_attribute(test, FlakyTestAttributes.FAILURES) or []
             all_errors.append(error)
             self._set_flaky_attribute(test, FlakyTestAttributes.FAILURES, all_errors)
-            if self._get_flaky_attribute(test, FlakyTestAttributes.RUNS) < self._get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS):
+            if self._get_flaky_attribute(test, FlakyTestAttributes.RUNS) \
+                    < self._get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS):
                 skipped = exc_info.typename == "Skipped"
                 return not skipped
         return False
@@ -242,7 +243,8 @@ class FlakybotRunner:
 
     @staticmethod
     def did_test_pass(test):
-        return FlakybotRunner._get_flaky_attribute(test, FlakyTestAttributes.PASSES) >= FlakybotRunner._get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
+        return FlakybotRunner._get_flaky_attribute(test, FlakyTestAttributes.PASSES) \
+               >= FlakybotRunner._get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
 
     @staticmethod
     def is_flaky_test(test):
