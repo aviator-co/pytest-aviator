@@ -1,3 +1,4 @@
+# TODO: set back to default values when finished debugging
 DEFAULT_MAX_RUNS = 5
 DEFAULT_MIN_PASSES = 2
 
