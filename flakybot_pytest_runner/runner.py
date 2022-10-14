@@ -100,8 +100,7 @@ class FlakybotRunner:
                 if passed:
                     should_rerun = self.handle_success(item)
                 else:
-                    skipped = exc_info.typename == "Skipped"
-                    should_rerun = not skipped and self.handle_failure(item, exc_info)
+                    should_rerun = self.handle_failure(item, exc_info)
                     if not should_rerun:
                         item.excinfo = exc_info
         finally:
@@ -164,6 +163,10 @@ class FlakybotRunner:
         return test_instance
 
     @staticmethod
+    def _get_flaky_attribute(test_item, attr):
+        return getattr(test_item, attr, None)
+
+    @staticmethod
     def _get_flaky_attributes(test_item):
         """
         Get all the flaky related attributes from the test.
@@ -172,7 +175,7 @@ class FlakybotRunner:
         :return: Dictionary containing attributes.
         """
         return {
-            attr: getattr(test_item, attr, None) for attr in FlakyTestAttributes().items()
+            attr: FlakybotRunner._get_flaky_attribute(test_item, attr) for attr in FlakyTestAttributes().items()
         }
 
     @staticmethod
@@ -200,11 +203,11 @@ class FlakybotRunner:
 
     def handle_failure(self, test, exc_info):
         """
-        Handle a test failure.
+        Handle a test failure. Ensures that the FlakyTestAttributes (RUNS, FAILURES) are updated.
 
         :param test: The test that failed.
         :param exc_info: The test failure info.
-        :return: True if the test should be rerun, otherwise False.
+        :return: True if the test has not reached the MAX_RUNS and should be rerun, otherwise False.
         """
         if exc_info:
             error = (exc_info.type, exc_info.value, exc_info.traceback)
@@ -213,34 +216,33 @@ class FlakybotRunner:
 
         if self.is_flaky_test(test):
             self.increment(test, FlakyTestAttributes.RUNS)
-            all_errors = getattr(test, FlakyTestAttributes.FAILURES, None) or []
+            all_errors = self._get_flaky_attribute(test, FlakyTestAttributes.FAILURES) or []
             all_errors.append(error)
-            attr_dict = self._get_flaky_attributes(test)
-            attr_dict[FlakyTestAttributes.FAILURES] = all_errors
-            if attr_dict[FlakyTestAttributes.RUNS] < attr_dict[FlakyTestAttributes.MAX_RUNS]:
-                return True
+            self._set_flaky_attribute(test, FlakyTestAttributes.FAILURES, all_errors)
+            if self._get_flaky_attribute(test, FlakyTestAttributes.RUNS) < self._get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS):
+                skipped = exc_info.typename == "Skipped"
+                return not skipped
         return False
 
     def handle_success(self, test):
         """
-        Handle a test success.
+        Handle a test success. Ensures that the FlakyTestAttributes (RUNS, PASSES) are updated.
 
         :param test: The test that passed.
-        :return: True if the test should be rerun, otherwise False.
+        :return: True if the test has not reached MIN_PASSES and should be rerun, otherwise False.
         """
         if not self.is_flaky_test(test):
             return False
         self.increment(test, FlakyTestAttributes.RUNS)
         self.increment(test, FlakyTestAttributes.PASSES)
-        attr_dict = self._get_flaky_attributes(test)
-        return not self.did_test_pass(attr_dict)
+        return not self.did_test_pass(test)
 
     def increment(self, test, attribute):
-        self._set_flaky_attribute(test, attribute, getattr(test, attribute, None) + 1)
+        self._set_flaky_attribute(test, attribute, getattr(test, attribute, 0) + 1)
 
     @staticmethod
-    def did_test_pass(attr_dict):
-        return attr_dict[FlakyTestAttributes.PASSES] >= attr_dict[FlakyTestAttributes.MIN_PASSES]
+    def did_test_pass(test):
+        return FlakybotRunner._get_flaky_attribute(test, FlakyTestAttributes.PASSES) >= FlakybotRunner._get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
 
     @staticmethod
     def is_flaky_test(test):
