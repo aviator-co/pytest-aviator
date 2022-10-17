@@ -66,7 +66,7 @@ class FlakybotRunner:
                 self.flaky_tests[test["test_name"]] = test
 
     def pytest_runtest_protocol(self, item, nextitem):
-        class_name = self._get_class_name(item)
+        class_name = self.get_class_name(item)
 
         if (
             self.flaky_tests and
@@ -79,7 +79,7 @@ class FlakybotRunner:
                 min_passes = self.flaky_tests[item.name]["min_passes"]
             if self.flaky_tests[item.name].get("max_runs"):
                 max_runs = self.flaky_tests[item.name]["max_runs"]
-            self._mark_flaky(item, max_runs, min_passes)
+            self.mark_flaky(item, max_runs, min_passes)
 
         self.call_infos[item] = {}
         default_call_and_report = self.runner.call_and_report
@@ -91,7 +91,6 @@ class FlakybotRunner:
                 for when in ["setup", "call"]:
                     call_info = self.call_infos.get(item, {}).get(when, None)
                     exc_info = getattr(call_info, "excinfo", None)
-                    print(f"exc info: {exc_info}")
                     if exc_info:
                         break
 
@@ -99,11 +98,11 @@ class FlakybotRunner:
                     return False
                 passed = not exc_info
                 if passed:
-                    print(f"PASSED")
-                    should_rerun = False
+                    should_rerun = self.handle_success(item)
                 else:
-                    print(f"NOT PASSED")
-                    # TODO: count failures
+                    should_rerun = self.handle_failure(item, exc_info)
+                    if not should_rerun:
+                        item.excinfo = exc_info
         finally:
             self.runner.call_and_report = default_call_and_report
             del self.call_infos[item]
@@ -127,7 +126,7 @@ class FlakybotRunner:
             hook.pytest_exception_interact(node=item, call=call, report=report)
         return report
 
-    def _get_class_name(self, test):
+    def get_class_name(self, test):
         """
         Gets the combined module and class name of the test.
 
@@ -136,14 +135,14 @@ class FlakybotRunner:
             eg. "src.test.TestSample" for tests within a class
                 or "src.test" for tests not in a class
         """
-        test_instance = self._get_test_instance(test)
+        test_instance = self.get_test_instance(test)
         class_name = test_instance.__name__
         if getattr(test_instance, "__module__", None):
             class_name = test_instance.__module__ + "." + test_instance.__name__
         return class_name
 
     @staticmethod
-    def _get_test_name(test):
+    def get_test_name(test):
         """
         Gets the test name.
 
@@ -156,7 +155,7 @@ class FlakybotRunner:
         return callable_name
 
     @staticmethod
-    def _get_test_instance(item):
+    def get_test_instance(item):
         test_instance = getattr(item, "instance", None)
         if test_instance is None:
             if hasattr(item, "parent") and hasattr(item.parent, "obj"):
@@ -164,19 +163,11 @@ class FlakybotRunner:
         return test_instance
 
     @staticmethod
-    def _get_flaky_attributes(test_item):
-        """
-        Get all the flaky related attributes from the test.
-
-        :param test_item: The test `Item` object from which to get the flaky related attributes.
-        :return: Dictionary containing attributes.
-        """
-        return {
-            attr: getattr(test_item, attr, None) for attr in FlakyTestAttributes().items()
-        }
+    def get_flaky_attribute(test_item, attr):
+        return getattr(test_item, attr, None)
 
     @staticmethod
-    def _set_flaky_attribute(test_item, attr, value):
+    def set_flaky_attribute(test_item, attr, value):
         """
         Sets an attribute on a flaky test.
 
@@ -186,7 +177,7 @@ class FlakybotRunner:
         """
         test_item.__dict__[attr] = value
 
-    def _mark_flaky(self, test, max_runs=None, min_passes=None):
+    def mark_flaky(self, test, max_runs=None, min_passes=None):
         """
         Mark a test as flaky by setting flaky attributes.
 
@@ -196,7 +187,59 @@ class FlakybotRunner:
         """
         attr_dict = FlakyTestAttributes.default_flaky_attributes(max_runs, min_passes)
         for attr, value in attr_dict.items():
-            self._set_flaky_attribute(test, attr, value)
+            self.set_flaky_attribute(test, attr, value)
+
+    def handle_failure(self, test, exc_info):
+        """
+        Handle a test failure. Record the failure in the form of FlakyTestAttributes (RUNS, FAILURES).
+
+        :param test: The test that failed.
+        :param exc_info: The test failure info.
+        :return: True if the test has not reached the MAX_RUNS and should be rerun, otherwise False.
+        """
+        skipped = exc_info.typename == "Skipped"
+        if skipped:
+            return False
+
+        if exc_info:
+            error = (exc_info.type, exc_info.value, exc_info.traceback)
+        else:
+            error = (None, None, None)
+
+        if self.is_flaky_test(test):
+            self.increment(test, FlakyTestAttributes.RUNS)
+            all_errors = self.get_flaky_attribute(test, FlakyTestAttributes.FAILURES) or []
+            all_errors.append(error)
+            self.set_flaky_attribute(test, FlakyTestAttributes.FAILURES, all_errors)
+            if self.get_flaky_attribute(test, FlakyTestAttributes.RUNS) \
+                    < self.get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS):
+                return not skipped
+        return False
+
+    def handle_success(self, test):
+        """
+        Handle a test success. Record the success in the form of FlakyTestAttributes (RUNS, PASSES).
+
+        :param test: The test that passed.
+        :return: True if the test has not reached MIN_PASSES and should be rerun, otherwise False.
+        """
+        if not self.is_flaky_test(test):
+            return False
+        self.increment(test, FlakyTestAttributes.RUNS)
+        self.increment(test, FlakyTestAttributes.PASSES)
+        return not self.did_test_pass(test)
+
+    def increment(self, test, attribute):
+        self.set_flaky_attribute(test, attribute, getattr(test, attribute, 0) + 1)
+
+    @staticmethod
+    def did_test_pass(test):
+        return FlakybotRunner.get_flaky_attribute(test, FlakyTestAttributes.PASSES) \
+               >= FlakybotRunner.get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
+
+    @staticmethod
+    def is_flaky_test(test):
+        return FlakyTestAttributes.MIN_PASSES in test.__dict__
 
 
 PLUGIN = FlakybotRunner()
