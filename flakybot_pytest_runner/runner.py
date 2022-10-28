@@ -228,11 +228,11 @@ class FlakybotRunner:
             error = (None, None, None)
 
         if self.is_flaky_test(test):
+            should_handle = self.check_handle_failure(test)  # must do this check before incrementing RUNS
             all_errors = self.get_flaky_attribute(test, FlakyTestAttributes.FAILURES) or []
             all_errors.append(error)
             self.set_flaky_attribute(test, FlakyTestAttributes.FAILURES, all_errors)
             self.increment(test, FlakyTestAttributes.RUNS)
-            should_handle = self.check_handle_failure(test)
 
             if should_handle:
                 self.log_failure(test, error)
