@@ -97,6 +97,9 @@ class FlakybotRunner:
                 if not call_info:
                     return False
                 passed = not exc_info
+
+                # This is the only place we modify FlakyTestAttributes on the test object (RUNS, PASSES, FAILURES).
+                # `pytest_runtest_protocol` corresponds with each test run.
                 if passed:
                     should_rerun = self.add_success(item)
                 else:
@@ -110,15 +113,17 @@ class FlakybotRunner:
 
     def call_and_report(self, item, when, log=True, **kwds):
         """
-        Monkey patch this runner method to get the CallInfo objects.
-            https://docs.pytest.org/en/7.1.x/_modules/_pytest/runner.html
-            CallInfo: https://docs.pytest.org/en/7.1.x/reference/reference.html#callinfo
+        Monkey patch this runner method - https://docs.pytest.org/en/7.1.x/_modules/_pytest/runner.html.
+            We do this to access `pytest_runtest_logreport`. This allows us to avoid reporting each test rerun
+            and only report the final status of a test once all reruns are complete.
         """
         call = runner.call_runtest_hook(item, when, **kwds)
         self.call_infos[item][when] = call
         hook = item.ihook
         report = hook.pytest_runtest_makereport(item=item, call=call)
 
+        # Do not increment FlakyTestAttributes on the test object here. This method is called during all test phases:
+        #   "setup", "call", and "teardown". We should only log the test report on the final test run.
         if report.when in ("call", "setup"):
             if report.outcome == "passed":
                 if self.check_handle_success(item):
