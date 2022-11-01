@@ -211,7 +211,7 @@ class FlakybotRunner:
         :param passed: Whether the test passed.
         :return: True if the test should be rerun, otherwise False.
         """
-        if not self.is_flaky_test(test):
+        if not self.has_flaky_overrides(test):
             return False
         runs = self.get_flaky_attribute(test, FlakyTestAttributes.RUNS) + 1
         max_runs = self.get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS)
@@ -234,7 +234,7 @@ class FlakybotRunner:
         else:
             error = (None, None, None)
 
-        if self.is_flaky_test(test):
+        if self.has_flaky_overrides(test):
             # Must do the `should_rerun` check before incrementing RUNS, the method itself will add 1 run.
             should_rerun = self.should_rerun(test, passed=False)
             all_errors = self.get_flaky_attribute(test, FlakyTestAttributes.FAILURES) or []
@@ -254,7 +254,7 @@ class FlakybotRunner:
         :param test: The test that passed.
         :return: True if the test has not reached MIN_PASSES and should be rerun, otherwise False.
         """
-        if not self.is_flaky_test(test):
+        if not self.has_flaky_overrides(test):
             return False
         self.increment(test, FlakyTestAttributes.RUNS)
         self.increment(test, FlakyTestAttributes.PASSES)
@@ -286,7 +286,7 @@ class FlakybotRunner:
                >= FlakybotRunner.get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
 
     @staticmethod
-    def is_flaky_test(test):
+    def has_flaky_overrides(test):
         return FlakyTestAttributes.MIN_PASSES in test.__dict__
 
 
