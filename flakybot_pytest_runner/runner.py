@@ -3,6 +3,7 @@ import requests
 
 from flakybot_pytest_runner.attributes import FlakyTestAttributes, DEFAULT_MIN_PASSES, DEFAULT_MAX_RUNS
 from _pytest import runner
+from io import StringIO
 
 API_URL = "https://api.aviator.co/api/v1/flaky-tests"
 AVIATOR_MARKER = "aviator"
@@ -16,6 +17,7 @@ class FlakybotRunner:
     min_passes = DEFAULT_MIN_PASSES
     max_runs = DEFAULT_MAX_RUNS
     call_infos = {}
+    stream = StringIO()
 
     def __init__(self):
         super().__init__()
@@ -32,6 +34,14 @@ class FlakybotRunner:
         self.runner = config.pluginmanager.getplugin("runner")
 
         config.addinivalue_line("markers", f"{AVIATOR_MARKER}: marks flaky tests for Flakybot to automatically rerun")
+
+    def pytest_terminal_summary(self, terminalreporter):
+        """
+        Pytest hook to add to the terminal summary.
+
+        :param terminalreporter: Pytest terminal reporter object.
+        """
+        self.construct_flakybot_report(terminalreporter)
 
     def get_flaky_tests(self):
         repo_name = None
@@ -245,6 +255,11 @@ class FlakybotRunner:
             if should_rerun:
                 self.log_failure(test, error)
                 return True
+            self.stream.writelines([
+                str(self.get_test_name(test)),
+                ": FAILED\n\t",
+                f"It passed {self.get_flaky_attribute(test, FlakyTestAttributes.PASSES)} out of the required {self.get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)} times.\n"
+            ])
         return False
 
     def add_success(self, test):
@@ -258,7 +273,17 @@ class FlakybotRunner:
             return False
         self.increment(test, FlakyTestAttributes.RUNS)
         self.increment(test, FlakyTestAttributes.PASSES)
-        return not self.did_test_pass(test)
+        passes = self.get_flaky_attribute(test, FlakyTestAttributes.PASSES)
+        min_passes = self.get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
+        requires_rerun = not self.did_test_pass(test)
+
+        self.stream.writelines([
+            str(self.get_test_name(test)),
+            f" passed {passes} out of the required {min_passes} times.\n"
+        ])
+        if requires_rerun:
+            self.stream.write(f"Running test again until it passes {min_passes} times.\n\n")
+        return requires_rerun
 
     def increment(self, test, attribute):
         self.set_flaky_attribute(test, attribute, getattr(test, attribute, 0) + 1)
@@ -267,12 +292,31 @@ class FlakybotRunner:
         max_runs = self.get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS)
         current_runs = self.get_flaky_attribute(test, FlakyTestAttributes.RUNS)
         runs_left = max_runs - current_runs
-        # TODO: generate nicer report
-        print(self.get_test_name(test), "\n")
-        print(f"failed ({runs_left} runs remaining out of {max_runs}).", "\n")
-        print(error[0], "\n")
-        print(error[1], "\n")
-        print(error[2])
+
+        self.stream.writelines([
+            str(self.get_test_name(test)),
+            "\n\t",
+            f"FAILED: ({runs_left} runs remaining out of {max_runs}).",
+            "\n\t",
+            str(error[0]),
+            ": ",
+            str(error[1]),
+            "\n\t",
+            str(error[2]),
+            "\n\n",
+        ])
+
+    def construct_flakybot_report(self, stream):
+        value = self.stream.getvalue()
+
+        stream.write("===FlakyBot Test Report===\n\n")
+
+        try:
+            stream.write(value)
+        except UnicodeEncodeError:
+            stream.write(value.encode("utf-8", "replace"))
+
+        stream.write("\n===End FlakyBot Test Report===\n")
 
     @staticmethod
     def should_rerun_test(runs, max_runs, passes, min_passes):
