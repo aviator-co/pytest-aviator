@@ -253,7 +253,7 @@ class FlakybotRunner:
             self.increment(test, FlakyTestAttributes.RUNS)
 
             if should_rerun:
-                self.log_failure(test, error)
+                self.log_rerun_failure(test, error)
                 return True
             self.stream.writelines([
                 str(self.get_test_name(test)),
@@ -271,24 +271,25 @@ class FlakybotRunner:
         """
         if not self.has_flaky_overrides(test):
             return False
+        # Must do the `should_rerun` check before incrementing RUNS and PASSES, the method itself will add 1 run/pass.
+        should_rerun = self.should_rerun(test, passed=True)
         self.increment(test, FlakyTestAttributes.RUNS)
         self.increment(test, FlakyTestAttributes.PASSES)
         passes = self.get_flaky_attribute(test, FlakyTestAttributes.PASSES)
         min_passes = self.get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
-        requires_rerun = not self.did_test_pass(test)
 
         self.stream.writelines([
             str(self.get_test_name(test)),
             f" passed {passes} out of the required {min_passes} times.\n"
         ])
-        if requires_rerun:
+        if should_rerun:
             self.stream.write(f"Running test again until it passes {min_passes} times.\n\n")
-        return requires_rerun
+        return should_rerun
 
     def increment(self, test, attribute):
         self.set_flaky_attribute(test, attribute, getattr(test, attribute, 0) + 1)
 
-    def log_failure(self, test, error):
+    def log_rerun_failure(self, test, error):
         max_runs = self.get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS)
         current_runs = self.get_flaky_attribute(test, FlakyTestAttributes.RUNS)
         runs_left = max_runs - current_runs
@@ -308,7 +309,6 @@ class FlakybotRunner:
 
     def construct_flakybot_report(self, stream):
         value = self.stream.getvalue()
-
         stream.write("===FlakyBot Test Report===\n\n")
 
         try:
@@ -323,11 +323,6 @@ class FlakybotRunner:
         has_runs_remaining = runs < max_runs
         needs_more_passes = passes < min_passes
         return has_runs_remaining and needs_more_passes
-
-    @staticmethod
-    def did_test_pass(test):
-        return FlakybotRunner.get_flaky_attribute(test, FlakyTestAttributes.PASSES) \
-               >= FlakybotRunner.get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
 
     @staticmethod
     def has_flaky_overrides(test):
