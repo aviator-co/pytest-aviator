@@ -123,13 +123,12 @@ class FlakybotRunner:
         report = hook.pytest_runtest_makereport(item=item, call=call)
 
         # Do not increment FlakyTestAttributes on the test object here. This method is called during all test phases:
-        #   "setup", "call", and "teardown". We should only log the test report on the final test run.
+        #   "setup", "call", and "teardown". We only increment the counts during `pytest_runtest_protocol` since that
+        #   method is called exactly once for each test run. We log the test report for each test run during the
+        #   "teardown" phase.
         if report.when in ("call", "setup"):
-            if report.outcome == "passed":
-                if self.check_handle_success(item):
-                    log = False
-            elif report.outcome == "failed":
-                if self.check_handle_failure(item):
+            if report.outcome == "passed" or report.outcome == "failed":
+                if self.should_rerun(item):
                     log = False
         if log:
             hook.pytest_runtest_logreport(report=report)
@@ -200,19 +199,21 @@ class FlakybotRunner:
         for attr, value in attr_dict.items():
             self.set_flaky_attribute(test, attr, value)
 
-    def check_handle_failure(self, test):
+    def should_rerun(self, test):
         """
-        Check if the failed test should be rerun.
+        Check if the test should be rerun.
         Does not make any changes to the FlakyTestAttribute info stored on the test object.
 
-        :param test: The test that failed.
+        :param test: The test to check.
         :return: True if the test should be rerun, otherwise False.
         """
         if not self.is_flaky_test(test):
             return False
-        flaky_info = self.get_flaky_info_copy(test)
-        flaky_info[FlakyTestAttributes.RUNS] += 1
-        return self.should_rerun_test(flaky_info)
+        runs = self.get_flaky_attribute(test, FlakyTestAttributes.RUNS) + 1
+        max_runs = self.get_flaky_attribute(test, FlakyTestAttributes.MAX_RUNS)
+        passes = self.get_flaky_attribute(test, FlakyTestAttributes.PASSES)
+        min_passes = self.get_flaky_attribute(test, FlakyTestAttributes.MIN_PASSES)
+        return self.should_rerun_test(runs=runs, max_runs=max_runs, passes=passes, min_passes=min_passes)
 
     def add_failure(self, test, exc_info):
         """
@@ -228,13 +229,14 @@ class FlakybotRunner:
             error = (None, None, None)
 
         if self.is_flaky_test(test):
-            should_handle = self.check_handle_failure(test)  # must do this check before incrementing RUNS
+            # Must do the `should_rerun` check before incrementing RUNS, the method itself will add 1 run.
+            should_rerun = self.should_rerun(test)
             all_errors = self.get_flaky_attribute(test, FlakyTestAttributes.FAILURES) or []
             all_errors.append(error)
             self.set_flaky_attribute(test, FlakyTestAttributes.FAILURES, all_errors)
             self.increment(test, FlakyTestAttributes.RUNS)
 
-            if should_handle:
+            if should_rerun:
                 self.log_failure(test, error)
                 return True
         return False
@@ -252,26 +254,6 @@ class FlakybotRunner:
         self.increment(test, FlakyTestAttributes.PASSES)
         return not self.did_test_pass(test)
 
-    def check_handle_success(self, test):
-        """
-        Check if the successful test should be rerun.
-        Does not make any changes to the FlakyTestAttribute info stored on the test object.
-
-        :param test: The test that passed.
-        :return: True if the test should be rerun, otherwise False.
-        """
-        if not self.is_flaky_test(test):
-            return False
-        flaky_info = self.get_flaky_info_copy(test)
-        flaky_info[FlakyTestAttributes.RUNS] += 1
-        flaky_info[FlakyTestAttributes.PASSES] += 1
-        return not self.did_info_pass(flaky_info)
-
-    def get_flaky_info_copy(self, test):
-        return {
-            attribute: self.get_flaky_attribute(test, attribute) for attribute in FlakyTestAttributes().items()
-        }
-
     def increment(self, test, attribute):
         self.set_flaky_attribute(test, attribute, getattr(test, attribute, 0) + 1)
 
@@ -287,16 +269,10 @@ class FlakybotRunner:
         print(error[2])
 
     @staticmethod
-    def should_rerun_test(flaky_info):
-        has_runs_remaining = flaky_info[FlakyTestAttributes.RUNS] < flaky_info[FlakyTestAttributes.MAX_RUNS]
-        needs_more_passes = flaky_info[FlakyTestAttributes.PASSES] < flaky_info[FlakyTestAttributes.MIN_PASSES]
-        if has_runs_remaining and needs_more_passes:
-            return True
-        return False
-
-    @staticmethod
-    def did_info_pass(flaky_info):
-        return flaky_info[FlakyTestAttributes.PASSES] >= flaky_info[FlakyTestAttributes.MIN_PASSES]
+    def should_rerun_test(runs, max_runs, passes, min_passes):
+        has_runs_remaining = runs < max_runs
+        needs_more_passes = passes < min_passes
+        return has_runs_remaining and needs_more_passes
 
     @staticmethod
     def did_test_pass(test):
