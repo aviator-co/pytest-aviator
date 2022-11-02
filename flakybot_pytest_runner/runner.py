@@ -42,6 +42,7 @@ class FlakybotRunner:
         junit_plugin = config.pluginmanager.getplugin("junitxml")
         if not junit_plugin:
             print("ERROR: use the --junitxml flag in your pytest run.")
+            return
         self.xml_key = junit_plugin.xml_key
 
     def pytest_terminal_summary(self, terminalreporter):
@@ -147,6 +148,7 @@ class FlakybotRunner:
             self.log_xml = self.config.stash.get(self.xml_key, None)
         if not self.log_xml:
             print("ERROR: use the --junitxml flag in your pytest run.")
+            return
         reporter = self.log_xml._opentestcase(report)
 
         # Do not increment FlakyTestAttributes on the test object here. This method is called during all test phases:
