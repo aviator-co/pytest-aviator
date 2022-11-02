@@ -115,8 +115,8 @@ Make sure to include the `store_artifacts` step in your config.yml.
 ```
 See the [CircleCI docs](https://circleci.com/docs/artifacts) for more information.
 
-## Flakybot API Token
-Make sure to set your account's Flakybot API token as an environment variable `FLAKY_BOT_API_URL`. You can find the token at https://app.aviator.co/account/api.
+## Aviator API Token
+Make sure to set your account's Aviator API token as an environment variable `AVIATOR_API_URL`. You can find the token at https://app.aviator.co/account/api.
 
 [CircleCI](https://circleci.com/docs/env-vars) - set the variable under the Project Settings page.
 
