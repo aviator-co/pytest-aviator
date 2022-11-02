@@ -18,6 +18,9 @@ class FlakybotRunner:
     max_runs = DEFAULT_MAX_RUNS
     call_infos = {}
     stream = StringIO()
+    log_xml = None
+    xml_key = None
+    config = None
 
     def __init__(self):
         super().__init__()
@@ -32,8 +35,12 @@ class FlakybotRunner:
         :return: None
         """
         self.runner = config.pluginmanager.getplugin("runner")
-
         config.addinivalue_line("markers", f"{AVIATOR_MARKER}: marks flaky tests for Flakybot to automatically rerun")
+        # Get the xml_key from the JUnitXml plugin so we can modify the xml later.
+        # https://docs.pytest.org/en/7.1.x/_modules/_pytest/junitxml.html
+        junit_plugin = config.pluginmanager.getplugin("junitxml")
+        self.xml_key = junit_plugin.xml_key
+        self.config = config
 
     def pytest_terminal_summary(self, terminalreporter):
         """
@@ -132,17 +139,32 @@ class FlakybotRunner:
         hook = item.ihook
         report = hook.pytest_runtest_makereport(item=item, call=call)
 
+        # Get the LogXML object in order to write to the junitxml.
+        # See `pytest_runtest_logreport` in LogXML - https://docs.pytest.org/en/7.1.x/_modules/_pytest/junitxml.html
+        if not self.log_xml:
+            self.log_xml = self.config.stash.get(self.xml_key, None)
+        reporter = self.log_xml._opentestcase(report)
+
         # Do not increment FlakyTestAttributes on the test object here. This method is called during all test phases:
         #   "setup", "call", and "teardown". We only increment the counts during `pytest_runtest_protocol` since that
         #   method is called exactly once for each test run. We log the test report for each test run during the
         #   "teardown" phase.
         if report.when in ("call", "setup"):
             if report.outcome == "passed":
+                if report.when == "call":
+                    reporter.append_pass(report)
                 if self.should_rerun(item, passed=True):
                     log = False
             elif report.outcome == "failed":
+                if report.when == "call":
+                    reporter.append_failure(report)
+                else:
+                    reporter.append_error(report)
                 if self.should_rerun(item, passed=False):
                     log = False
+        if report.skipped:
+            reporter.append_skipped(report)
+
         if log:
             hook.pytest_runtest_logreport(report=report)
         if self.runner.check_interactive_exception(call, report):
