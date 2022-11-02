@@ -151,19 +151,17 @@ class FlakybotRunner:
         #   "teardown" phase.
         if report.when in ("call", "setup"):
             if report.outcome == "passed":
-                if report.when == "call":
-                    reporter.append_pass(report)
                 if self.should_rerun(item, passed=True):
                     log = False
+                    if report.when == "call":
+                        reporter.append_pass(report)
             elif report.outcome == "failed":
-                if report.when == "call":
-                    reporter.append_failure(report)
-                else:
-                    reporter.append_error(report)
                 if self.should_rerun(item, passed=False):
                     log = False
-        if report.skipped:
-            reporter.append_skipped(report)
+                    if report.when == "call":
+                        reporter.append_failure(report)
+                    else:
+                        reporter.append_error(report)
 
         if log:
             hook.pytest_runtest_logreport(report=report)
