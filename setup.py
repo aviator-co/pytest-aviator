@@ -33,6 +33,10 @@ def main():
         keywords='pytest plugin flaky tests rerun retry flakybot',
         python_requires='>=3.5',
         classifiers=CLASSIFIERS,
+        install_requires=[
+            'pytest',
+            'requests'
+        ]
     )
 
 
