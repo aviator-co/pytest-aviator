@@ -85,7 +85,7 @@ test_sample_random: FAILED
 Install the plugin before running tests with pytest.
 
 ```
-pip install -e git+https://git@github.com/aviator-co/pytest-flakybot.git#egg=pytest-flakybot
+pip install -e git+https://git@github.com/aviator-co/pytest-aviator.git#egg=pytest-aviator
 ```
 
 ## Store Test Artifacts
