@@ -1,7 +1,7 @@
 import os
 import requests
 
-from flakybot_pytest_runner.attributes import FlakyTestAttributes, DEFAULT_MIN_PASSES, DEFAULT_MAX_RUNS
+from src.pytest_aviator.attributes import FlakyTestAttributes, DEFAULT_MIN_PASSES, DEFAULT_MAX_RUNS
 from _pytest import runner
 from io import StringIO
 
