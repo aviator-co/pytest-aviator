@@ -1,6 +1,5 @@
-# TODO: set back to default values when finished debugging
-DEFAULT_MAX_RUNS = 5
-DEFAULT_MIN_PASSES = 2
+DEFAULT_MAX_RUNS = 2
+DEFAULT_MIN_PASSES = 1
 
 
 class FlakyTestAttributes:
