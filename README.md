@@ -77,7 +77,7 @@ test_sample_random: FAILED
 	It passed 1 out of the required 2 times.
 
 ===End FlakyBot Test Report===
-============================== 1failed, 5 passed in 0.08s ===============================
+============================== 1 failed, 5 passed in 0.08s ===============================
 ```
 
 ## Install
@@ -85,7 +85,7 @@ test_sample_random: FAILED
 Install the plugin before running tests with pytest.
 
 ```
-pip install -e git+https://git@github.com/aviator-co/pytest-aviator.git#egg=pytest-aviator
+pip install pytest-aviator
 ```
 
 ## Store Test Artifacts
