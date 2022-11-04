@@ -77,7 +77,7 @@ test_sample_random: FAILED
 	It passed 1 out of the required 2 times.
 
 ===End FlakyBot Test Report===
-============================== 6 passed in 0.08s ===============================
+============================== 1failed, 5 passed in 0.08s ===============================
 ```
 
 ## Install

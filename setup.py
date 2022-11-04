@@ -18,19 +18,20 @@ CLASSIFIERS = [
 def main():
     base_dir = dirname(__file__)
     setup(
-        name='pytest-flakybot',
+        name='pytest-aviator',
         version='0.1.1',
+        license="MIT",
         description='Aviator\'s Flakybot pytest plugin that automatically reruns flaky tests.',
         long_description=open(join(base_dir, 'README.md')).read(),
         author='aviator-co',
-        author_email='info@aviator.co',
-        url='https://github.com/aviator-co/pytest-flakybot',
+        author_email='engineering@aviator.co',
+        url='https://github.com/aviator-co/pytest-aviator',
         entry_points={
             'pytest11': [
-                'flakybot_pytest_runner = flakybot_pytest_runner.runner'
+                'pytest_aviator = pytest_aviator.runner'
             ]
         },
-        keywords='pytest plugin flaky tests rerun retry flakybot',
+        keywords='pytest plugin flaky tests rerun retry flakybot aviator',
         python_requires='>=3.5',
         classifiers=CLASSIFIERS,
         install_requires=[
