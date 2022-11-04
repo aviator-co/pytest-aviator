@@ -21,7 +21,7 @@ with open("README.md", "r") as f:
 def main():
     setup(
         name="pytest-aviator",
-        version="0.1.3",
+        version="0.1.1",
         license="MIT",
         description="Aviator\'s Flakybot pytest plugin that automatically reruns flaky tests.",
         long_description=readme,
