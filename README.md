@@ -116,7 +116,7 @@ Make sure to include the `store_artifacts` step in your config.yml.
 See the [CircleCI docs](https://circleci.com/docs/artifacts) for more information.
 
 ## Aviator API Token
-Make sure to set your account's Aviator API token as an environment variable `AVIATOR_API_URL`. You can find the token at https://app.aviator.co/account/api.
+Make sure to set your account's Aviator API token as an environment variable `AVIATOR_API_TOKEN`. You can find the token at https://app.aviator.co/account/api.
 
 [CircleCI](https://circleci.com/docs/env-vars) - set the variable under the Project Settings page.
 
